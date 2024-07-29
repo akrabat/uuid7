@@ -13,17 +13,23 @@ package_name=uuid7
 #
 # The full list of the platforms is at: https://golang.org/doc/install/source#environment
 platforms=(
-"linux/amd64"
-"linux/arm"
-"linux/arm64"
-"windows/amd64"
-"windows/arm64"
+"darwin/amd64"
+"darwin/arm64"
 )
 
 rm -rf release/
 mkdir -p release
 
+set -e
 set -x
+
+echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+security create-keychain -p password1234 build.keychain
+security default-keychain -s build.keychain
+security unlock-keychain -p password1234 build.keychain
+security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k password1234 build.keychain
+
 
 for platform in "${platforms[@]}"
 do
@@ -36,11 +42,8 @@ do
         os="macOS"
     fi
 
-    output_name=$package_name
-    zip_name=$package_name'-'$version'-'$os'-'$GOARCH
-    if [ $os = "windows" ]; then
-        output_name+='.exe'
-    fi
+    output_name="$package_name"
+    zip_name="$package_name"'-'$version'-'$os'-'$GOARCH
 
     echo "Building release/$zip_name..."
     env GOOS=$GOOS GOARCH=$GOARCH go build \
@@ -51,14 +54,20 @@ do
         exit 1
     fi
 
-    pushd release > /dev/null
-    if [ $os = "windows" ]; then
-        zip $zip_name.zip $output_name
-        rm $output_name
-    else
-        chmod a+x $output_name
-        zip $zip_name.zip $output_name
-        rm $output_name
-    fi
-    popd > /dev/null
+    pushd release > /dev/null || exit
+
+    # List
+    ls -l
+    
+    # sign with identity 3D8D...
+    /usr/bin/codesign --force -s "$MACOS_IDENTITY_ID" "$output_name" -v
+
+    # create zip file
+    chmod a+x "$output_name"
+    zip "$zip_name".zip "$output_name"
+    rm "$output_name"
+
+    popd > /dev/null || exit
 done
+
+security delete-keychain build.keychain

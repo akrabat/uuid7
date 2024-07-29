@@ -19,7 +19,7 @@ func main() {
 		return
 	}
 	if len(os.Args) > 1 && (os.Args[1] == "-v" || os.Args[1] == "--version") {
-		fmt.Println("uuid7 version 0.1")
+		fmt.Println("uuid7 version 0.1.1")
 		fmt.Println("by Rob Allen")
 		fmt.Println("https://github.com/akrabat/uuid7")
 		return
